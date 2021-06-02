@@ -258,14 +258,15 @@ mod tests {
 	use sp_core::{Bytes, H256};
 	use hex_literal::hex;
 	use sp_runtime::DispatchError;
-	use frame_support::{assert_ok, dispatch::DispatchResult, weights::Weight};
+	use frame_support::{
+		assert_ok,
+		dispatch::{DispatchResult, DispatchResultWithPostInfo},
+		weights::Weight,
+	};
 	use assert_matches::assert_matches;
 	use pallet_contracts_primitives::{ExecReturnValue, ReturnFlags};
 	use pretty_assertions::assert_eq;
-	use sp_std::borrow::BorrowMut;
-
-	#[derive(Debug, PartialEq, Eq)]
-	struct DispatchEntry(Call);
+	use sp_std::{borrow::BorrowMut, cell::RefCell};
 
 	#[derive(Debug, PartialEq, Eq)]
 	struct RestoreEntry {
@@ -313,6 +314,7 @@ mod tests {
 		restores: Vec<RestoreEntry>,
 		// (topics, data)
 		events: Vec<(Vec<H256>, Vec<u8>)>,
+		runtime_calls: RefCell<Vec<Call>>,
 		schedule: Schedule<Test>,
 		rent_params: RentParams<Test>,
 		gas_meter: GasMeter<Test>,
@@ -335,6 +337,7 @@ mod tests {
 				transfers: Default::default(),
 				restores: Default::default(),
 				events: Default::default(),
+				runtime_calls: Default::default(),
 				schedule: Default::default(),
 				rent_params: Default::default(),
 				gas_meter: GasMeter::new(10_000_000_000),
@@ -480,6 +483,10 @@ mod tests {
 		fn append_debug_buffer(&mut self, msg: &str) -> bool {
 			self.debug_buffer.extend(msg.as_bytes());
 			true
+		}
+		fn call_runtime(&self, call: <Self::T as Config>::Call) -> DispatchResultWithPostInfo {
+			self.runtime_calls.borrow_mut().push(call);
+			Ok(Default::default())
 		}
 	}
 
@@ -2158,6 +2165,48 @@ mod tests {
 				error: Error::<Test>::DebugMessageInvalidUTF8.into(),
 				origin: ErrorOrigin::Caller,
 			})
+		);
+	}
+
+	#[test]
+	#[cfg(feature = "unstable-interface")]
+	fn call_runtime_works() {
+		const CODE_CALL_RUNTIME: &str = r#"
+(module
+	(import "__unstable__" "seal_call_runtime" (func $seal_call_runtime (param i32 i32) (result i32)))
+	(import "seal0" "seal_input" (func $seal_input (param i32 i32)))
+	(import "seal0" "seal_return" (func $seal_return (param i32 i32 i32)))
+	(import "env" "memory" (memory 1 1))
+
+	;; 0x1000 = 4k in little endian
+	;; size of input buffer
+	(data (i32.const 0) "\00\10")
+
+	(func (export "call")
+		(call $seal_input
+			(i32.const 4)	;; Pointer to the input buffer
+			(i32.const 0)	;; Size of the length buffer
+		)
+		(call $seal_call_runtime
+			(i32.const 4)				;; Pointer where the call is stored
+			(i32.load (i32.const 0))	;; Size of the call
+		)
+		drop
+	)
+
+	(func (export "deploy"))
+)
+"#;
+		let call = Call::System(frame_system::Call::remark(b"Hello World".to_vec()));
+		let mut ext = MockExt::default();
+		execute(
+			CODE_CALL_RUNTIME,
+			call.encode(),
+			&mut ext,
+		).unwrap();
+		assert_eq!(
+			*ext.runtime_calls.borrow(),
+			vec![call],
 		);
 	}
 }

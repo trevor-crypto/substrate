@@ -286,6 +286,8 @@ impl Config for Test {
 	type Randomness = Randomness;
 	type Currency = Balances;
 	type Event = Event;
+	type Call = Call;
+	type CallFilter = ();
 	type RentPayment = ();
 	type SignedClaimHandicap = SignedClaimHandicap;
 	type TombstoneDeposit = TombstoneDeposit;
