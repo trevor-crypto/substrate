@@ -23,7 +23,7 @@ use codec::Encode;
 use frame_support::{
 	assert_noop, assert_ok, parameter_types, ord_parameter_types,
 	traits::{SortedMembers, OnInitialize, Filter, GenesisBuild},
-	weights::Weight, storage::StorageMap,
+	weights::Weight,
 };
 use sp_core::H256;
 use sp_runtime::{
@@ -123,6 +123,8 @@ parameter_types! {
 	pub const MaxLocks: u32 = 10;
 }
 impl pallet_balances::Config for Test {
+	type MaxReserves = ();
+	type ReserveIdentifier = [u8; 8];
 	type MaxLocks = MaxLocks;
 	type Balance = u64;
 	type Event = Event;
