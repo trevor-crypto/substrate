@@ -48,7 +48,7 @@ std = [
 	"sp-runtime-interface/std",
 	"sp-externalities",
 	"sp-wasm-interface/std",
-	"sp-maybe-compressed-blob",
+	"sp-maybe-compressed-blob/std",
 	"sp-tracing/std",
 	"tracing/std",
 	"tracing-core/std",
